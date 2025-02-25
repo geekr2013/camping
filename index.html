@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>캠핑 물품 리스트</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 10px;
+      background-color: #fafafa;
+    }
+    h1 {
+      text-align: center;
+    }
+    #reset {
+      display: block;
+      margin: 10px auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .category {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    .item {
+      padding: 10px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    /* 준비 완료 항목은 덜 강조되도록 */
+    .prepared {
+      background-color: #e0e0e0;
+      color: #777;
+    }
+    /* 미준비 항목은 눈에 더 띄게 */
+    .unprepared {
+      background-color: #fff;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <h1>캠핑 물품 리스트</h1>
+  <button id="reset">초기화</button>
+  <div id="list"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // 구글 스프레드시트 CSV URL (게시한 스프레드시트의 CSV 출력 URL)
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRi8sv8kml9DvL5uIz5NujrpMXrLnvF2jCuogGgBu6DIjOjPeDFWDxz_y_H0DLPNpO17M1iE1NfI11O/pub?output=csv';
+
+      // 간단한 CSV 파싱 함수: 줄별로 나눈 후 쉼표 기준으로 분리
+      function parseCSV(text) {
+        const lines = text.trim().split('\n');
+        return lines.map(line => line.split(','));
+      }
+
+      // localStorage에서 체크 상태 불러오기
+      function loadState() {
+        return JSON.parse(localStorage.getItem('campingListState') || '{}');
+      }
+
+      // 체크 상태 저장
+      function saveState(state) {
+        localStorage.setItem('campingListState', JSON.stringify(state));
+      }
+
+      // CSV 데이터를 기반으로 리스트 렌더링
+      function renderList(data) {
+        const listDiv = document.getElementById('list');
+        listDiv.innerHTML = '';
+        const state = loadState();
+        let currentCategory = '';
+
+        // A2~B40 영역이라 가정: 첫 행은 헤더일 수 있으므로 인덱스 1부터 시작
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (row.length < 2) continue; // 데이터 부족한 행은 건너뜁니다.
+          const category = row[0].trim();
+          const item = row[1].trim();
+          
+          // 카테고리 변경 시 제목 추가
+          if (category !== currentCategory) {
+            currentCategory = category;
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'category';
+            categoryDiv.textContent = category;
+            listDiv.appendChild(categoryDiv);
+          }
+
+          // 항목 요소 생성
+          const itemDiv = document.createElement('div');
+          itemDiv.classList.add('item');
+          // 고유 키 생성 (행 번호와 항목 텍스트 조합)
+          const key = i + '_' + item;
+          const isPrepared = state[key] || false;
+          itemDiv.classList.add(isPrepared ? 'prepared' : 'unprepared');
+          itemDiv.textContent = item;
+          
+          // 클릭 시 체크 상태 토글
+          itemDiv.addEventListener('click', function() {
+            state[key] = !state[key];
+            saveState(state);
+            renderList(data);
+          });
+          listDiv.appendChild(itemDiv);
+        }
+      }
+
+      // CSV 데이터 가져오기 및 렌더링
+      fetch(csvUrl)
+        .then(response => response.text())
+        .then(text => {
+          const data = parseCSV(text);
+          renderList(data);
+        })
+        .catch(error => {
+          console.error('CSV 데이터 불러오기 실패:', error);
+          document.getElementById('list').innerHTML = '데이터를 불러오지 못했습니다.';
+        });
+
+      // 초기화 버튼: localStorage 삭제 후 리스트 재렌더링
+      document.getElementById('reset').addEventListener('click', function() {
+        localStorage.removeItem('campingListState');
+        fetch(csvUrl)
+          .then(response => response.text())
+          .then(text => {
+            const data = parseCSV(text);
+            renderList(data);
+          });
+      });
+    });
+  </script>
+</body>
+</html>
